@@ -128,3 +128,10 @@ wsj_frontpage: 1. What were the key financial performance indicators for Coheren
 3. Added flow chart: FinancialLLMRetreivalFlow.pdf
 4. Improved structured output slightly, added description (more realistic results), tried gt but still doesn't work
 5. Ran all sample, see dropbox for csv and q distribution
+
+
+## New TODO
+1. Let LLM give summary of conference call + two keywords query
+2. Retrieve same industry 10K
+3. Improve prompt for q ratio
+4. Ran 50 samples
