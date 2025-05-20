@@ -10,4 +10,5 @@
 4. Modified plotting to histogram
 
 ## New TODO
-1. 
+1. add paper namespaces, test for retreival quality and find best
+2. paper rag query: definition, properties, empirical regularity, and distribution of marginal q
