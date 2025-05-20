@@ -1,0 +1,11 @@
+pinecone
+langchain-pinecone
+dropbox
+pandas
+requests
+tqdm
+datatime
+pydantic
+matplotlib
+openai
+python-dotenv
