@@ -20,6 +20,10 @@ You will be provided several sections of information and based on these informat
 {wsj_text}
 === END OF ARTICLE ===
 
+=== ACADEMIC RESEARCH TEXT ON TOBIN'S Q RATIO (MARKET VALUE / IMPLEMENTATION COST) ===
+{academic_research_text}
+=== END OF ACADEMIC RESEARCH TEXT ===
+
 === QUESTION ===
 {question}
 === END OF QUESTION ===
@@ -46,6 +50,7 @@ def build_q1(
     conference_call_text: str,
     patents_text: str,
     wsj_text: str,
+    academic_research_text: str,
     question: str
 ) -> str:
     """
@@ -59,6 +64,7 @@ def build_q1(
         conference_call_text=conference_call_text,
         patents_text=patents_text,
         wsj_text=wsj_text,
+        academic_research_text=academic_research_text,
         question=question
     )
 

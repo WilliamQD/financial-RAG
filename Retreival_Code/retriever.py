@@ -1,8 +1,8 @@
 import json
 import re
 from typing import Tuple, Dict, Any, List, Optional
-from pinecone_client import retrieve_from_namespace
-from prompt_builder import Q1_TEMPLATE, Q2_TEMPLATE, build_q1, build_q2
+from pinecone_client import retrieve_from_namespace, retrieve_academic_text, retrieve_academic_text_query
+from prompt_builder import build_q1, build_q2
 from llm_client import client
 from models import ProjectsPayload, Project
 
@@ -50,6 +50,7 @@ def make_conf_call_query(
         f"{year} {company} conference call highlights: "
         "financial performance, key strategic priorities"
     )
+
 
 
 def make_namespaces_query(
@@ -169,6 +170,8 @@ def generate_predictions(gvkey, fyear, cusip, comn):
         top_k=10
     )
 
+    acedemic_research_text = retrieve_academic_text_query()
+
     # PART 3: Q1
     q1_prompt = build_q1(
         company_name=comn,
@@ -178,6 +181,7 @@ def generate_predictions(gvkey, fyear, cusip, comn):
         conference_call_text=text_conf_call,
         patents_text=patents_text,
         wsj_text=wsj_text,
+        academic_research_text=acedemic_research_text,
         question=QUESTION_1
     )
     resp1 = client.chat.completions.create(

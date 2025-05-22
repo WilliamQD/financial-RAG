@@ -31,7 +31,7 @@ def main():
     results = pd.DataFrame(columns=cols).astype(dtypes)
 
     # which sample to run
-    sample_size = 50
+    sample_size = 10
 
     sub_sample = sample[sample['sample'] == sample_size]
     gvkeys = sub_sample['gvkey'].astype(str).str.lstrip('0').astype(int)   
