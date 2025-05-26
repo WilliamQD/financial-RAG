@@ -5,3 +5,4 @@
 ## New TODO
 1. clean up academic paper (try gpt latex)
 2. change clustering methods, find most informative clusters (relating to tobin's q)
+3. BERTopic¶
