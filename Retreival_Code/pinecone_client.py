@@ -1,4 +1,4 @@
-import os
+import re
 from langchain_pinecone import PineconeEmbeddings
 from pinecone import Pinecone
 from config import PINECONE_API_KEY
@@ -35,7 +35,7 @@ def retrieve_academic_text():
     return "\n".join(reps_text)
 
 def retrieve_academic_text_query():
-    querys = [
+    queries = [
         "Tobin’s q definition firm value ratio replacement cost theoretical concept",
         "Tobin’s q theoretical properties investment sensitivity adjustment dynamics",
         "Tobin’s q empirical regularities cross-sectional studies average median skewness",
@@ -43,14 +43,22 @@ def retrieve_academic_text_query():
     ]
 
     texts = []
-    for query in querys:
-        text = retrieve_from_namespace(query=query, namespace="academic-papers", top_k=5)
-        texts.append(text)
+    for query in queries:
+        raw = retrieve_from_namespace(
+            query=query,
+            namespace="academic-papers",
+            top_k=5
+        )
+        # 1) remove null bytes
+        clean = raw.replace('\x00', '')
+        # 2) optionally remove any other weird control chars (e.g., ASCII <32 except newline/tab)
+        clean = re.sub(r'[\x00-\x08\x0b-\x1f\x7f]', '', clean)
+        texts.append(clean)
 
     result = "\n".join(texts)
-    
+
     # also save in a txt file
-    with open("academic_text.txt", "w") as f:
+    with open("academic_text.txt", "w", encoding="utf-8") as f:
         f.write(result)
-    
+
     return result

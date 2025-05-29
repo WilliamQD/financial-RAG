@@ -31,14 +31,29 @@ def main():
     results = pd.DataFrame(columns=cols).astype(dtypes)
 
     # which sample to run
-    sample_size = 10
+    sample_size = 100
 
-    sub_sample = sample[sample['sample'] == sample_size]
+    # include all sample tiers ≤ the chosen size
+    available_sizes   = [10, 50, 100]
+    selected_sizes    = [s for s in available_sizes if s <= sample_size]
+    sub_sample        = sample[sample['sample'].isin(selected_sizes)]
+
     gvkeys = sub_sample['gvkey'].astype(str).str.lstrip('0').astype(int)   
     df_filtered = merged[
-    merged['gvkey'].isin(gvkeys) &
-    merged['fyear'].between(1993, 2022)] 
-    
+        merged['gvkey'].isin(gvkeys) 
+        & merged['fyear'].between(1993, 2022)
+    ]
+
+    # set up paths *before* the loop
+    ts        = datetime.now().strftime("%Y-%m-%d-%H%M")
+    base      = f"{sample_size}_{ts}"
+    path      = os.path.join(RESULTS_DIR, base)
+    csv_path  = f"{path}.csv"
+    plot_path = f"{path}_qs.png"
+
+    # write only header to start
+    results.head(0).to_csv(csv_path, index=False)
+
     to_run = df_filtered
 
     # Iterate samples and generate predictions
@@ -54,15 +69,16 @@ def main():
             cusip=cusip,
             comn=comn
         )
+        # add to in-memory DataFrame
         results.loc[len(results)] = output
 
-    # Save results
-    ts   = datetime.now().strftime("%Y-%m-%d-%H%M")
-    base = f"{sample_size}_{ts}"
-    path = os.path.join(RESULTS_DIR, base)
-    csv_path = f"{path}.csv"
-    plot_path = f"{path}_qs.png"
-    results.to_csv(csv_path, index=False)
+        # append just this one row to disk
+        pd.DataFrame([output]).to_csv(
+            csv_path,
+            mode='a',
+            header=False,
+            index=False
+        )
     print(f"Results saved to {csv_path}")
 
     # Plot and save q ratio densities
