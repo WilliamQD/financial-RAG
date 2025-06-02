@@ -38,6 +38,14 @@ Want to try next:
 3. Improve some OpenAI codes. o4-mini is a better reasoning model. 4.1 is not a reasoning model but will benefit from chain-of-thoughts.
 - new API: https://platform.openai.com/docs/guides/text?api-mode=responses
 - identity, insturctions, examples
+- Reasoning model explained: https://platform.openai.com/docs/guides/reasoning?api-mode=responses&example=research
 4. https://cookbook.openai.com/examples/gpt4-1_prompting_guide 
 - GPT-4.1 is highly steerable and responsive to well-specified prompts - if model behavior is different from what you expect, a single sentence firmly and unequivocally clarifying your desired behavior is almost always sufficient to steer the model on course.
 5. add extra stage behind structure output so it doesn't adversely affect the results.
+
+
+## New TODO
+1. System Role
+2. Add company specific information to prompt
+3. change llm workflow (create to append)
+4. update API
