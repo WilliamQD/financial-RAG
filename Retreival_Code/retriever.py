@@ -2,42 +2,41 @@ import json
 import re
 from typing import Tuple, Dict, Any, List, Optional
 from pinecone_client import retrieve_from_namespace, retrieve_academic_text, retrieve_academic_text_query
-from prompt_builder import build_q1, build_q2
+from prompt_builder import build_q1, build_q2, build_financial_data
 from llm_client import client
 from models import ProjectsPayload, Project
 
 # define QUESTION_1, QUESTION_2 here
 
 QUESTION_1 = """
-1. Read the Business Description Section: Describe the company’s core business and strategic direction.
-2. Read the Management Discussion and Analysis: Analyze the MD&A section to grasp management’s interpretation of past performance, current challenges, and future outlook.
-3. Identify Current Investment Focus: Determine the company’s current projects and business model as disclosed in the annual report.
+1. Read the Business Description Section: Describe the company's core business and strategic direction.
+2. Read the Management Discussion and Analysis: Analyze the MD&A section to grasp management's interpretation of past performance, current challenges, and future outlook.
+3. Identify Current Investment Focus: Determine the company's current projects and business model as disclosed in the annual report.
 4. Analyze the Market and Competitive Environment: Examine the industry dynamics and competitive environment mentioned in the annual report.
 
 Please provide a detailed report summarizing your findings from these steps.
 """
 
 QUESTION_2 = """
-Based on your previous analysis, your next task is to predict the company’s next three potential projects for consideration.
+Based on your previous analysis, your next task is to predict the company's next three potential projects for consideration. 
 
-Formatting Guidelines:
-  - Return **only** JSON that matches the given schema.
-  - Each object must include:
-    “PROJECT”: The name of the proposed project.
-    “DESCRIPTION”: A brief description of the project.
-    “MARKET VALUE”: Estimated market value in million dollars USD.
-    “IMPLEMENTATION COST”: Estimated cost to implement the project in million dollars USD. Can be larger than market value.
-    “REASONING”: Explanation for why this project is proposed.
-      • **In your reasoning**, call out the key drivers—projected revenues, operating expenses (materials, labor), R&D spend, capital intensity, and market conditions—that justify your estimates.
-    “CONFIDENCE”: A confidence level in the prediction (0-100).
-    “SIMILAR FIRMS”: A list of three public firms engaged in similar businesses, including their names and tickers.
-    “PRIORITY”: A priority ranking (1-3). 1 is highest.
-    “PRIORITY_REASONING”: Justification for the assigned priority.
+For each project, provide:
+- PROJECT: A concise name for the proposed project.
+- DESCRIPTION: A brief description of the project.
+- MARKET VALUE: An estimated market value in million USD.
+- IMPLEMENTATION COST: An estimated cost to implement the project in million USD. Can be larger than market value.
+- REASONING: A detailed explanation justifying the project, including key drivers such as projected revenues, operating expenses (materials, labor), R&D spend, capital intensity, and market conditions.
+- CONFIDENCE: Your confidence level in the prediction (0-100).
+- SIMILAR FIRMS: A list of three public firms engaged in similar businesses, including their names and tickers.
+- PRIORITY: A priority ranking (1-3), where 1 is the highest.
+- PRIORITY_REASONING: Justification for the assigned priority.
 
-Additional Guidance (do **not** include these bullets in your output):
-  - Academic studies of Tobin's q (market value / implementation cost) report a distribution with **mean=1.11**, **median=0.57**, **std = 1.91**, and **skewness = 3.76**. 
-  - Use your financial judgment—think about sales growth, margin profiles, capital intensity, and risk factors—when assigning each MARKET VALUE and IMPLEMENTATION COST.
+**Guidance for realistic estimation (for reference only, not to appear in output):**
+- Tobin's q is (market value / implementation cost). Empirical distribution: mean=1.11, median=0.57, std=1.91, skewness=3.76. Many projects realistically have q < 1 due to strategic necessity, competitive pressures, or market uncertainties.
+- Your estimates should reflect plausible scenarios informed by historical and market context—avoid overly optimistic valuations. Consider realistic scenarios such as cost overruns, competitive reactions, market size limitations, and technological or operational hurdles.
 """
+
+
 
 def make_conf_call_query(
     company: str,
@@ -92,26 +91,32 @@ def make_namespaces_query(
 
 
 
-def extract_q_values(
-    projects: List[Project]
-) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+def extract_q_values(projects):
     """
-    Given a list of Project objects, return the three q‑ratios:
-      q1 = projects[0].market_value / projects[0].implementation_cost
-      q2 = projects[1].market_value / projects[1].implementation_cost
-      q3 = projects[2].market_value / projects[2].implementation_cost
-    """
-    if not projects or len(projects) < 3:
-        return None, None, None
-    try:
-        q1 = projects[0].market_value / projects[0].implementation_cost
-        q2 = projects[1].market_value / projects[1].implementation_cost
-        q3 = projects[2].market_value / projects[2].implementation_cost
-    except Exception:
-        return None, None, None
-    return q1, q2, q3
+    Given a list of Project objects, always return exactly three (q, market_value, cost) tuples:
+      [(q1, mk1, cost1), (q2, mk2, cost2), (q3, mk3, cost3)].
 
-def generate_predictions(gvkey, fyear, cusip, comn):
+    For each i in {0,1,2}:
+      - If projects[i] exists and its cost≠0, compute q = mk / cost.
+      - Otherwise, return (None, None, None) for that slot.
+    """
+    results = []
+    for i in range(3):
+        try:
+            proj = projects[i]
+            mk = proj.market_value
+            cost = proj.implementation_cost
+            q = mk / cost
+        except (IndexError, AttributeError, ZeroDivisionError, TypeError):
+            q = mk = cost = None
+
+        results.append((q, mk, cost))
+
+    return results
+
+    
+
+def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
     """
     1. Seeds retrieval from conference calls
     2. Generates per‑namespace queries based on those calls
@@ -172,11 +177,22 @@ def generate_predictions(gvkey, fyear, cusip, comn):
 
     acedemic_research_text = retrieve_academic_text_query()
 
-    # PART 3: Q1
+    if comp_row.empty:
+        print(f"No comp data for gvkey={gvkey}, fyear={fyear}")
+        financial_data = ""
+    else:
+        row = comp_row.iloc[0]
+        financial_data = build_financial_data(
+            row["firm_asset"],row["firm_sale"],row["firm_emp"],
+            row["firm_bkleverage"],row["firm_profitability"],row["firm_roa"],row["firm_cash2at"],
+            row["v"],row["k_phys"],row["i_phys"],row["i_int"],row["xrd"],row["i_tot"],row["k_tot"]
+        )
+
     q1_prompt = build_q1(
         company_name=comn,
         gvkey=gvkey,
         fyear=fyear,
+        financial_data=financial_data,
         item1_and_item7_text=combined_10k,
         conference_call_text=text_conf_call,
         patents_text=patents_text,
@@ -184,13 +200,21 @@ def generate_predictions(gvkey, fyear, cusip, comn):
         academic_research_text=acedemic_research_text,
         question=QUESTION_1
     )
-    resp1 = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": q1_prompt}],
-        max_tokens=1024,
-        temperature=0.0
+
+    resp1 = client.responses.create(
+        model="o4-mini",
+        reasoning={"effort": "medium"},
+        input=[
+            {
+                "role": "user", 
+                "content": q1_prompt
+            }
+        ],
+        # max_tokens=1024,
+        # temperature=0.0
     )
-    answer_q1 = resp1.choices[0].message.content.strip()
+    answer_q1 = resp1.output_text.strip()
+    first_response_id = resp1.id
 
     # PART 4: Q2
     chat_hist = f"User asked Q1: {QUESTION_1}\nAssistant answered: {answer_q1}"
@@ -198,29 +222,70 @@ def generate_predictions(gvkey, fyear, cusip, comn):
         chat_history_str=chat_hist,
         question=QUESTION_2
     )
-    resp2 = client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": q2_prompt}],
-        max_tokens=1500,
-        temperature=0.0,
-        response_format=ProjectsPayload
+    resp2 = client.responses.parse(
+        model="o4-mini",
+        reasoning={"effort": "medium"},
+        input=[
+            {
+                "role": "user", 
+                "content": q2_prompt
+            }
+        ],
+        # max_completion_tokens=1500, # need to figure out how reasoning model max tokens work
+        # temperature=0.9, # no temp setting for parse
+        text_format=ProjectsPayload,
+        previous_response_id=first_response_id
     )
-    answer_q2_projects = resp2.choices[0].message.parsed.projects
-    answer_q2 = json.loads(resp2.choices[0].message.parsed.model_dump_json())
+    answer_q2 = resp2.output_parsed.projects
 
-    # PART 5: extract q1,q2,q3
-    q1, q2, q3 = extract_q_values(answer_q2_projects)
+    # PART 5: extract q1,q2,q3, mk1, cost1, mk2, cost2, mk3, cost3
+    qs = extract_q_values(answer_q2)
+    proj1 = qs[0]
+    proj2 = qs[1]
+    proj3 = qs[2]
+    q1, mk1, cost1 = proj1
+    q2, mk2, cost2 = proj2
+    q3, mk3, cost3 = proj3
+
 
     part1_queries_str = "\n\n".join(f"{ns}: {qry}" for ns, qry in part1_queries.items())
 
     return {
         "gvkey": gvkey,
         "fyear": fyear,
-        "part1_queries": part1_queries_str,
-        "q1_prompt": q1_prompt,
-        "q1_answer": answer_q1,
-        "q2_answer": answer_q2,
+        # "part1_queries": part1_queries_str,
+        # "q1_prompt": q1_prompt,
+        # "q1_answer": answer_q1,
+        # "q2_answer": answer_q2,
         "q1": q1,
         "q2": q2,
-        "q3": q3
+        "q3": q3,
+        "mkv1": mk1,
+        "cost1": cost1,
+        "mkv2": mk2,
+        "cost2": cost2,
+        "mkv3": mk3,
+        "cost3": cost3
     }
+
+if __name__ == "__main__":
+    q2_prompt = build_q2(
+        chat_history_str="",
+        question=QUESTION_2
+    )
+    resp2 = client.responses.parse(
+        model="o4-mini",
+        reasoning={"effort": "medium"},
+        input=[
+            {
+                "role": "user", 
+                "content": q2_prompt
+            }
+        ],
+        # max_completion_tokens=1500,
+        # temperature=0.9,
+        text_format=ProjectsPayload
+    )
+    print(resp2.output_parsed.projects)
+    answer_q2_projects = resp2.output_parsed.projects
+    qs = extract_q_values(answer_q2_projects)

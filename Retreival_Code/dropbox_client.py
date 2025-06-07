@@ -22,7 +22,7 @@ def get_dropbox_client() -> Dropbox:
     return Dropbox(token)
 
 
-def download_csv(path: str) -> bytes:
+def download_file(path: str) -> bytes:
     dbx = get_dropbox_client()
     _, res = dbx.files_download(path)
     return res.content

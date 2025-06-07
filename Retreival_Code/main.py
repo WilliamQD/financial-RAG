@@ -2,7 +2,7 @@ import pandas as pd
 import os
 from tqdm import tqdm
 from datetime import datetime
-from data_loader import load_merged, load_sample
+from data_loader import load_merged, load_sample, load_comp_total
 from retriever import generate_predictions
 from plotting import plot_qs
 
@@ -12,26 +12,39 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 def main():
     # Load data
+    print("Loading data...")
     merged = load_merged()
     sample = load_sample()
+    comp_total = load_comp_total()
 
     # Prepare result DataFrame
-    cols = ['gvkey', 'fyear', 'part1_queries', 'q1_prompt', 'q1_answer', 'q2_answer', 'q1', 'q2', 'q3']
+    cols = ['gvkey', 'fyear', 
+            # 'part1_queries', 
+            # 'q1_prompt', 
+            # 'q1_answer', 'q2_answer',  # don't need this for now
+            'q1', 'q2', 'q3',
+            'mkv1', 'cost1', 'mkv2', 'cost2', 'mkv3', 'cost3']
     dtypes = {
         'gvkey': 'int64',
         'fyear': 'int64',
-        'part1_queries': 'object',
-        'q1_prompt': 'object',
-        'q1_answer': 'object',
-        'q2_answer': 'object',
+        # 'part1_queries': 'object',
+        # 'q1_prompt': 'object',
+        # 'q1_answer': 'object',
+        # 'q2_answer': 'object',
         'q1': 'float64',
         'q2': 'float64',
-        'q3': 'float64'
+        'q3': 'float64',
+        'mkv1': 'float64',
+        'cost1': 'float64',
+        'mkv2': 'float64',
+        'cost2': 'float64',
+        'mkv3': 'float64',
+        'cost3': 'float64'
     }
     results = pd.DataFrame(columns=cols).astype(dtypes)
 
     # which sample to run
-    sample_size = 100
+    sample_size = 10
 
     # include all sample tiers ≤ the chosen size
     available_sizes   = [10, 50, 100]
@@ -62,12 +75,14 @@ def main():
         fyear = row['fyear']
         cusip = row['cusip']
         comn = row['conm']
+        comp_row = comp_total[(comp_total['gvkey'] == int(gvkey)) & (comp_total['fyear'] == int(fyear))]
 
         output = generate_predictions(
             gvkey=gvkey,
             fyear=fyear,
             cusip=cusip,
-            comn=comn
+            comn=comn,
+            comp_row=comp_row
         )
         # add to in-memory DataFrame
         results.loc[len(results)] = output
