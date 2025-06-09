@@ -33,18 +33,6 @@ You will be provided several sections of information and based on these informat
 === END OF QUESTION ===
 """
 
-Q2_TEMPLATE = """
-Based on the chat history and the answer you made before, please perform the tasks at the end and provide detailed analyses.
-
-=== CHAT HISTORY ===
-{chat_history_str}
-=== END OF CHAT HISTORY ===
-
-=== QUESTION ===
-{question}
-=== END OF QUESTION ===
-"""
-
 def build_financial_data(
     firm_asset, firm_sale, firm_emp, firm_bkleverage,
     firm_profitability, firm_roa, firm_cash2at,
@@ -54,20 +42,20 @@ def build_financial_data(
     Assemble all financial metrics into a single string, one per line.
     """
     return (
-        f"Asset: {firm_asset} MM\n"
-        f"Sales: {firm_sale} MM\n"
-        f"Employees: {firm_emp} K\n"
-        f"Leverage: {firm_bkleverage} %\n"
-        f"Profitability: {firm_profitability} %\n"
-        f"Return on Asset: {firm_roa} %\n"
-        f"Cash to Asset: {firm_cash2at} %\n"
-        f"Market Value: {v} MM\n"
-        f"Book Value: {k_phys} MM\n"
-        f"Physical Capital Investment: {i_phys} MM\n"
-        f"Intangible Capital Investment: {i_int} MM\n"
-        f"Research and Development Investment: {xrd} MM\n"
-        f"Total Investment: {i_tot} MM\n"
-        f"Total Capital Stock: {k_tot} MM"
+        f"Asset: {firm_asset}\n"
+        f"Sales: {firm_sale}\n"
+        f"Employees: {firm_emp}\n"
+        f"Leverage: {firm_bkleverage}\n"
+        f"Profitability: {firm_profitability}\n"
+        f"Return on Asset: {firm_roa}\n"
+        f"Cash to Asset: {firm_cash2at}\n"
+        f"Market Value: {v}\n"
+        f"Book Value: {k_phys}\n"
+        f"Physical Capital Investment: {i_phys}\n"
+        f"Intangible Capital Investment: {i_int}\n"
+        f"Research and Development Investment: {xrd}\n"
+        f"Total Investment: {i_tot}\n"
+        f"Total Capital Stock: {k_tot}"
     )
 
 def build_q1(
@@ -98,7 +86,3 @@ def build_q1(
         academic_research_text=academic_research_text,
         question=question
     )
-
-
-def build_q2(chat_history_str, question) -> str:
-    return Q2_TEMPLATE.format(chat_history_str=chat_history_str, question=question)
