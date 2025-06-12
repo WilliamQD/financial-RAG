@@ -2,7 +2,7 @@ import json
 import re
 from typing import Tuple, Dict, Any, List, Optional
 from pinecone_client import retrieve_from_namespace, retrieve_academic_text, retrieve_academic_text_query
-from prompt_builder import build_q1, build_q2, build_financial_data
+from prompt_builder import build_q1, build_financial_data
 from llm_client import client
 from models import ProjectsPayload, Project
 
@@ -32,8 +32,7 @@ For each project, provide:
 - PRIORITY_REASONING: Justification for the assigned priority.
 
 **Guidance for realistic estimation (for reference only, not to appear in output):**
-- Tobin's q is (market value / implementation cost). Empirical distribution: mean=1.11, median=0.57, std=1.91, skewness=3.76. Many projects realistically have q < 1 due to strategic necessity, competitive pressures, or market uncertainties.
-- Your estimates should reflect plausible scenarios informed by historical and market context—avoid overly optimistic valuations. Consider realistic scenarios such as cost overruns, competitive reactions, market size limitations, and technological or operational hurdles.
+- Tobin's q is (market value / implementation cost). Empirical distribution: mean=1.11, median=0.57, std=1.91, skewness=3.76.
 """
 
 
@@ -202,7 +201,7 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
     )
 
     resp1 = client.responses.create(
-        model="o4-mini",
+        model="o3-mini",
         reasoning={"effort": "medium"},
         input=[
             {
@@ -217,18 +216,13 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
     first_response_id = resp1.id
 
     # PART 4: Q2
-    chat_hist = f"User asked Q1: {QUESTION_1}\nAssistant answered: {answer_q1}"
-    q2_prompt = build_q2(
-        chat_history_str=chat_hist,
-        question=QUESTION_2
-    )
     resp2 = client.responses.parse(
-        model="o4-mini",
+        model="o3-mini",
         reasoning={"effort": "medium"},
         input=[
             {
                 "role": "user", 
-                "content": q2_prompt
+                "content": QUESTION_2
             }
         ],
         # max_completion_tokens=1500, # need to figure out how reasoning model max tokens work
@@ -253,10 +247,10 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
     return {
         "gvkey": gvkey,
         "fyear": fyear,
-        # "part1_queries": part1_queries_str,
-        # "q1_prompt": q1_prompt,
-        # "q1_answer": answer_q1,
-        # "q2_answer": answer_q2,
+        # "part1_queries": part1_queries_str, # diagnostic
+        # "q1_prompt": q1_prompt, # diagnostic
+        # "q1_answer": answer_q1, # diagnostic
+        # "q2_answer": answer_q2, # diagnostic
         "q1": q1,
         "q2": q2,
         "q3": q3,
@@ -269,17 +263,13 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
     }
 
 if __name__ == "__main__":
-    q2_prompt = build_q2(
-        chat_history_str="",
-        question=QUESTION_2
-    )
     resp2 = client.responses.parse(
         model="o4-mini",
         reasoning={"effort": "medium"},
         input=[
             {
                 "role": "user", 
-                "content": q2_prompt
+                "content": QUESTION_2
             }
         ],
         # max_completion_tokens=1500,
