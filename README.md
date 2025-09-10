@@ -1,6 +1,6 @@
 # Financial RAG System
 
-A sophisticated Retrieval-Augmented Generation (RAG) system for financial analysis that predicts corporate investment projects and calculates Tobin's q ratios using multi-source financial data.
+A Retrieval-Augmented Generation (RAG) system for financial analysis that predicts corporate investment projects and calculates Tobin's q ratios using multi-source financial data.
 
 ## Overview
 
@@ -19,7 +19,7 @@ This system combines financial documents, conference calls, patents, and market 
 
 This Financial RAG System represents a significant advancement in automated corporate investment analysis, developed as part of ongoing research into AI-driven financial prediction methodologies. The system has successfully demonstrated the ability to predict corporate investment projects and calculate associated Tobin's q ratios with meaningful correlation to actual market outcomes.
 
-**Current Achievements**: The system integrates multiple sophisticated data sources including SEC 10-K filings, quarterly conference call transcripts, patent databases, Wall Street Journal articles, and academic research papers. Through advanced RAG architecture using Pinecone vector databases and OpenAI's latest language models, we have achieved correlation coefficients of 0.5-0.6 with actual q-ratios, which represents strong predictive performance in the financial domain where correlations above 0.3 are considered significant.
+**Current Achievements**: The system integrates multiple sophisticated data sources including SEC 10-K filings, quarterly conference call transcripts, patent databases, Wall Street Journal articles, and academic research papers. Through advanced RAG architecture using Pinecone vector databases and OpenAI's latest language models, we have achieved correlation coefficients of high 0.2 with actual q-ratios, which represents strong predictive performance in the financial domain given the scope of the project.
 
 **Technical Implementation**: The core innovation lies in the multi-namespace retrieval strategy that contextualizes company analysis across diverse information sources, coupled with financial anchoring using real Compustat data to ground AI predictions in actual market metrics. The system employs structured output generation through Pydantic models, ensuring consistent and validated predictions across all company analyses.
 
@@ -241,7 +241,7 @@ These benchmarks guide the LLM's project valuation and ensure realistic predicti
 
 The repository includes fine-tuning capabilities:
 - `SFT.py`: Supervised fine-tuning scripts for training custom models
-- `RFT.py`: Reinforcement fine-tuning from academic feedback  
+- `RFT.py`: Reinforcement fine-tuning built for OpenAI RFT  
 - `SFT_files/`, `RFT_files/`: Training data and model checkpoints
 - Model evaluation against real financial outcomes with correlation analysis
 
@@ -282,7 +282,7 @@ Key areas for continued research and improvement:
 ### Performance Characteristics
 
 Based on recent evaluation runs:
-- **Correlation with actual q-ratios**: ~0.5-0.6 (strong for financial predictions)
+- **Correlation with actual q-ratios**: ~0.2
 - **Processing time**: ~30-60 seconds per company analysis
 - **q-ratio distribution**: Mean≈1.3, closely matches academic literature
 - **Sample sizes**: Tested on 10, 50, and 100 company batches
