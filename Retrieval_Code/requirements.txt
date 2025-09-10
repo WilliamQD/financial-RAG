@@ -8,3 +8,5 @@ pydantic
 matplotlib
 openai
 python-dotenv
+scikit-learn
+ollama

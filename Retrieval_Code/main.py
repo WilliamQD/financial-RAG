@@ -2,15 +2,18 @@ import pandas as pd
 import os
 from tqdm import tqdm
 from datetime import datetime
-from data_loader import load_merged, load_sample, load_comp_total
-from retriever import generate_predictions
+from data_loader import load_merged, load_sample, load_comp_total, filter_test_entries
+# change normal or hpc version
+from retriever_hpc import generate_predictions
 from plotting import prepare_q_series, calculate_summary, plot_qs, generate_info, calculate_correlations
 
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(BASE_DIR, "results")
+RFT_DIR     = os.path.join(BASE_DIR, "RFT_files")
+SFT_DIR     = os.path.join(BASE_DIR, "SFT_files")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-def main():
+def main(verbose=False):
     # Load data
     print("Loading data...")
     merged = load_merged()
@@ -18,31 +21,20 @@ def main():
     comp_total = load_comp_total()
 
     # Prepare result DataFrame
-    cols = ['gvkey', 'fyear', 
-            # 'part1_queries', # diagnostic
-            # 'q1_prompt', # diagnostic
-            # 'q1_answer', 'q2_answer', # diagnostic
-            'q1', 'q2', 'q3',
-            'mkv1', 'cost1', 'mkv2', 'cost2', 'mkv3', 'cost3',
-            'q_tot']  # total q from comp_total
-    dtypes = {
+    base_cols = ['gvkey', 'fyear', 'q1', 'q2', 'q3', 'mkv1', 'cost1', 'mkv2', 'cost2', 'mkv3', 'cost3', 'q_tot']
+    verbose_cols = ['part1_queries', 'q1_prompt', 'q1_answer', 'q2_answer']
+    cols = base_cols + verbose_cols if verbose else base_cols
+
+    base_dtypes = {
         'gvkey': 'int64',
         'fyear': 'int64',
-        # 'part1_queries': 'object', # diagnostic
-        # 'q1_prompt': 'object', # diagnostic
-        # 'q1_answer': 'object', # diagnostic
-        # 'q2_answer': 'object', # diagnostic
-        'q1': 'float64',
-        'q2': 'float64',
-        'q3': 'float64',
-        'mkv1': 'float64',
-        'cost1': 'float64',
-        'mkv2': 'float64',
-        'cost2': 'float64',
-        'mkv3': 'float64',
-        'cost3': 'float64',
-        'q_tot': 'float64'
+        'q1': 'float64', 'q2': 'float64', 'q3': 'float64',
+        'mkv1': 'float64', 'cost1': 'float64', 'mkv2': 'float64', 'cost2': 'float64',
+        'mkv3': 'float64', 'cost3': 'float64', 'q_tot': 'float64'
     }
+    verbose_dtypes = {c: 'object' for c in verbose_cols}
+    dtypes = {**base_dtypes, **(verbose_dtypes if verbose else {})}
+
     results = pd.DataFrame(columns=cols).astype(dtypes)
 
     # which sample to run
@@ -72,7 +64,7 @@ def main():
     # write only header to start
     results.head(0).to_csv(csv_path, index=False)
 
-    to_run = df_filtered
+    to_run = filter_test_entries(df_filtered, os.path.join(RFT_DIR, "splits.csv"))
 
     # Iterate samples and generate predictions
     for _, row in tqdm(to_run.iterrows(), total=len(to_run), desc='Running samples'):
@@ -87,7 +79,8 @@ def main():
             fyear=fyear,
             cusip=cusip,
             comn=comn,
-            comp_row=comp_row
+            comp_row=comp_row,
+            verbose=verbose  
         )
         output['q_tot'] = comp_row['q_tot'].iloc[0] if not comp_row.empty else float('nan')
         # add to in-memory DataFrame
@@ -115,4 +108,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(verbose=False)
+    

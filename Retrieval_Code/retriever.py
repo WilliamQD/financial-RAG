@@ -1,13 +1,14 @@
 import json
 import re
 from typing import Tuple, Dict, Any, List, Optional
-from pinecone_client import retrieve_from_namespace, retrieve_academic_text, retrieve_academic_text_query
-from prompt_builder import build_q1, build_financial_data
+from pinecone_client import retrieve_from_namespace, retrieve_academic_text, retrieve_academic_text_query, retrieve_and_rerank
+from prompt_builder import build_q1, build_financial_data, DEV_MSG, HIGH_Q_EXAMPLE
 from llm_client import client
-from models import ProjectsPayload, Project
+from models import ProjectsPayload, create_json_schema
+
+import ollama
 
 # define QUESTION_1, QUESTION_2 here
-
 QUESTION_1 = """
 1. Read the Business Description Section: Describe the company's core business and strategic direction.
 2. Read the Management Discussion and Analysis: Analyze the MD&A section to grasp management's interpretation of past performance, current challenges, and future outlook.
@@ -18,21 +19,23 @@ Please provide a detailed report summarizing your findings from these steps.
 """
 
 QUESTION_2 = """
-Based on your previous analysis, your next task is to predict the company's next three potential projects for consideration. 
+Based on your previous analysis, predict the company's next three potential projects for consideration.
 
 For each project, provide:
-- PROJECT: A concise name for the proposed project.
-- DESCRIPTION: A brief description of the project.
+- PROJECT: A concise name.
+- DESCRIPTION: A brief description.
 - MARKET VALUE: An estimated market value in million USD.
 - IMPLEMENTATION COST: An estimated cost to implement the project in million USD. Can be larger than market value.
-- REASONING: A detailed explanation justifying the project, including key drivers such as projected revenues, operating expenses (materials, labor), R&D spend, capital intensity, and market conditions.
-- CONFIDENCE: Your confidence level in the prediction (0-100).
-- SIMILAR FIRMS: A list of three public firms engaged in similar businesses, including their names and tickers.
-- PRIORITY: A priority ranking (1-3), where 1 is the highest.
-- PRIORITY_REASONING: Justification for the assigned priority.
+- REASONING: Justify your estimates using key drivers (revenues, expenses, R&D, capital intensity, market conditions).
+- CONFIDENCE: Confidence (0-100).
+- SIMILAR FIRMS: Three public peers (name + ticker).
+- PRIORITY: Rank 1-3.
+- PRIORITY_REASONING: Why you chose that priority.
 
-**Guidance for realistic estimation (for reference only, not to appear in output):**
-- Tobin's q is (market value / implementation cost). Empirical distribution: mean=1.11, median=0.57, std=1.91, skewness=3.76.
+**Guidance** (for your internal reasoning only):
+- Tobin's q = market value / implementation cost.
+- From academic studies, q has mean≈1.11, median≈0.57, std≈1.91, skew≈3.76.
+- Anchor cost/value to the firm's metrics.
 """
 
 
@@ -115,7 +118,7 @@ def extract_q_values(projects):
 
     
 
-def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
+def generate_predictions(gvkey, fyear, cusip, comn, comp_row, verbose=False):
     """
     1. Seeds retrieval from conference calls
     2. Generates per‑namespace queries based on those calls
@@ -132,11 +135,12 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
     # PART 1: conference‑call seed & namespace queries
     conf_call_query = make_conf_call_query(comn, fyear)
     conf_call_filter = {"fiscal_year": {"$lte": fyear}, "CUSIP": cusip}
-    text_conf_call = retrieve_from_namespace(
+    text_conf_call = retrieve_and_rerank(
         query=conf_call_query,
         namespace="conference_call",
         metadata_filter=conf_call_filter,
-        top_k=20
+        top_k=40, #top_k=20
+        top_n=10
     )
 
     # Build a set of queries per namespace
@@ -146,32 +150,36 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
         part1_queries[ns] = make_namespaces_query(ns, comn, fyear, text_conf_call)
     
     # PART 2: retrieve from each namespace
-    item1_text = retrieve_from_namespace(
+    item1_text = retrieve_and_rerank(
         query=part1_queries["10K-item1"],
         namespace="10K-item1",
         metadata_filter={"fyear": {"$lte": fyear}, "gvkey": gvkey},
-        top_k=20
+        top_k=40, #top_k=20
+        top_n=10
     )
 
-    item7_text = retrieve_from_namespace(
+    item7_text = retrieve_and_rerank(
         query=part1_queries["10K-item7"],
         namespace="10K-item7",
         metadata_filter={"fyear": {"$lte": fyear}, "gvkey": gvkey},
-        top_k=20
+        top_k=40, #top_k=20
+        top_n=10
     )
     combined_10k = "\n----\n".join([item1_text, item7_text])
 
-    patents_text = retrieve_from_namespace(
+    patents_text = retrieve_and_rerank(
         query=part1_queries["patents"],
         namespace="patents",
         metadata_filter={"filing_year": {"$lte": fyear}, "gvkey": gvkey_str},
-        top_k=10
+        top_k=20, #top_k=10
+        top_n=5
     )
-    wsj_text = retrieve_from_namespace(
+    wsj_text = retrieve_and_rerank(
         query=part1_queries["wsj_frontpage"],
         namespace="wsj_frontpage",
         metadata_filter={"year": {"$lte": fyear}},
-        top_k=10
+        top_k=20, #top_k=10
+        top_n=5
     )
 
     acedemic_research_text = retrieve_academic_text_query()
@@ -184,7 +192,8 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
         financial_data = build_financial_data(
             row["firm_asset"],row["firm_sale"],row["firm_emp"],
             row["firm_bkleverage"],row["firm_profitability"],row["firm_roa"],row["firm_cash2at"],
-            row["v"],row["k_phys"],row["i_phys"],row["i_int"],row["xrd"],row["i_tot"],row["k_tot"]
+            row["v"],row["k_phys"],row["i_phys"],row["i_int"],row["xrd"],row["i_tot"],row["k_tot"],
+            row["q_tot"]
         )
 
     q1_prompt = build_q1(
@@ -201,9 +210,10 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
     )
 
     resp1 = client.responses.create(
-        model="o3-mini",
-        reasoning={"effort": "medium"},
+        model="gpt-4.1-mini-2025-04-14",
+        # reasoning={"effort": "medium"},
         input=[
+            DEV_MSG,
             {
                 "role": "user", 
                 "content": q1_prompt
@@ -217,9 +227,10 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
 
     # PART 4: Q2
     resp2 = client.responses.parse(
-        model="o3-mini",
+        model="ft:o4-mini-2025-04-16:ragresearchteam::BrdcYDoD:ckpt-step-10",
         reasoning={"effort": "medium"},
         input=[
+            DEV_MSG,
             {
                 "role": "user", 
                 "content": QUESTION_2
@@ -244,13 +255,9 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
 
     part1_queries_str = "\n\n".join(f"{ns}: {qry}" for ns, qry in part1_queries.items())
 
-    return {
+    result = {
         "gvkey": gvkey,
         "fyear": fyear,
-        # "part1_queries": part1_queries_str, # diagnostic
-        # "q1_prompt": q1_prompt, # diagnostic
-        # "q1_answer": answer_q1, # diagnostic
-        # "q2_answer": answer_q2, # diagnostic
         "q1": q1,
         "q2": q2,
         "q3": q3,
@@ -261,21 +268,28 @@ def generate_predictions(gvkey, fyear, cusip, comn, comp_row):
         "mkv3": mk3,
         "cost3": cost3
     }
+    if verbose:
+        result["part1_queries"] = part1_queries_str
+        result["q1_prompt"] = q1_prompt
+        result["q1_answer"] = answer_q1
+        result["q2_answer"] = answer_q2
+    return result
 
 if __name__ == "__main__":
-    resp2 = client.responses.parse(
-        model="o4-mini",
-        reasoning={"effort": "medium"},
+    # for testing only
+    resp1 = client.responses.create(
+        model="gpt-4.1-mini-2025-04-14",
+        # reasoning={"effort": "medium"},
         input=[
+            DEV_MSG,
             {
                 "role": "user", 
-                "content": QUESTION_2
+                "content": QUESTION_1
             }
         ],
-        # max_completion_tokens=1500,
-        # temperature=0.9,
-        text_format=ProjectsPayload
+        max_tokens=1024
     )
-    print(resp2.output_parsed.projects)
-    answer_q2_projects = resp2.output_parsed.projects
-    qs = extract_q_values(answer_q2_projects)
+    answer_q1 = resp1.output_text.strip()
+    first_response_id = resp1.id
+
+    
