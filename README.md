@@ -68,6 +68,29 @@ The system retrieves information from multiple financial data namespaces:
 - **wsj_frontpage**: Wall Street Journal market analysis
 - **academic-papers**: Research on Tobin's q and investment theory
 
+## Tech Stack
+
+- **Language & Runtime**: Python 3.8+
+- **LLM & AI APIs**: OpenAI API (`gpt-4o-mini`, `o3-mini`)
+- **RAG / Retrieval**: Pinecone vector database, LangChain Pinecone integration
+- **Reranking**: BGE-reranker-v2-m3
+- **Data & ETL**: Pandas, Dropbox API
+- **Modeling & Validation**: Pydantic
+- **Evaluation & Analytics**: Scikit-learn, Matplotlib
+- **Configuration & Environment**: python-dotenv
+- **Notebook Workflow**: Jupyter Notebook (`Pinecone_Retrieval.ipynb`)
+
+## Skills Demonstrated
+
+- Designing and implementing an end-to-end **RAG pipeline** for financial analysis
+- Building **multi-source data integration** workflows across filings, calls, patents, news, and research
+- Applying **semantic retrieval and reranking** to improve relevance and context quality
+- Using **structured LLM outputs** with schema validation for reliable downstream processing
+- Grounding model outputs with **financial anchoring** and domain-specific metrics (Tobin's q)
+- Running **quantitative evaluation** with correlation analysis and distribution diagnostics
+- Developing **batch and single-entity inference workflows** for scalable analysis
+- Maintaining reproducible, documented **research-engineering iteration cycles**
+
 ## Installation
 
 ### Prerequisites
